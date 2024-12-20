@@ -65,7 +65,7 @@ const toTitleCase = (str: string) => str.replace(/\w\S*/g, (txt) => txt.charAt(0
 
         // determine if serialized json present
         const serializedJSON = first ? 
-            await ((await fetch(`/resources/bonsai/serialized/tree_serialized_${seed}.json`)).json()) : 
+            await ((await fetch(`./resources/bonsai/serialized/tree_serialized_${seed}.json`)).json()) : 
             null;
 
         // set the rendering scale
