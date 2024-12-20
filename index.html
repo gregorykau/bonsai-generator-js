@@ -1,0 +1,137 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Bonsai Generator</title>
+    <meta name="description" content="Bonsai Generator">
+    <meta name="author" content="Kian G">
+
+    <meta property="og:title" content="Bonsai Generator">
+    <meta property="og:type" content="website">
+    <meta property="og:description"
+        content="An interactive Bonsai Generator using the technique of &quot;Space Colonization&quot; for branch growth.">
+</head>
+
+<style>
+    body {
+        background-color: #f6efdc;
+        overflow: hidden;
+        background-image: url('resources/ui/backnew.png');
+    }
+
+    .glossy {
+        border-style: double;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.41);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(2.9px);
+        -webkit-backdrop-filter: blur(2.9px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+
+    #optionsContainer {
+        position: absolute;
+        user-select: none;
+        bottom: 20px;
+        width: 400px;
+        display: flex;
+        flex-direction: row;
+        left: 50%;
+        transform: translate(-50%, 0);
+    }
+
+    #optionsContainer .btnOption {
+        padding: 5px;
+        user-select: none;
+        width: 40px;
+        height: 40px;
+    }
+    #optionsContainer .btnOption img {
+        height: 100%;
+    }
+
+    #optionsContainer .btnOption:hover {
+        cursor: pointer;
+    }
+
+    #optionsContainer #inpSeedText {
+        color: black;
+        flex-grow: 1;
+        font-size: 2rem;
+    }
+
+    #inpSeed {
+        flex-grow: 1; 
+        margin-right: 5px; 
+        text-align: center;
+    }
+
+    #btnSerialize {
+        user-select: none;
+        width: 100px;
+        position: absolute;
+        z-index: 9999;
+    }
+
+    #btnSerialize:hover {
+        cursor: pointer;
+    }
+
+    #treeGeneratorContainer {
+        position: absolute;
+        left: 0px;
+        top: 0px;
+        width: 100vw;
+        height: 100vh;
+    }
+
+    #txtTreeTitle {
+        pointer-events: none;
+        position: absolute;
+        left: 50%;
+        transform: translate(-50%, 0);
+        font-family: Verdana, sans-serif;
+        color: white;
+        text-align: center;
+        font-size: 5rem;
+        z-index: 1;
+        font-weight: bold;
+        -webkit-text-stroke-width: 1px;
+        -webkit-text-stroke-color: black;
+    }
+    #txtTreeTitle::after {
+        position: absolute;
+        left: 0%;
+        top: 100%;
+        background-color: white;
+        height: 8px;
+        display: inline-block;
+        top: 100%;
+        width: 100%;
+        border: 1px solid black;
+        content: '';
+    }
+</style>
+
+<body>
+    <div id="btnSerialize" class="glossy" style="display: none">
+        Serialize
+    </div>
+    <div id="txtTreeTitle"></div>
+    <div id="treeGeneratorContainer">
+
+    </div>
+    <div id="optionsContainer">
+        <input id="inpSeedText" type="text" class="glossy" placeholder="Custom Seed" maxlength="20">
+        <div id="btnRegenerate" class="btnOption glossy">
+            <img src="./resources/ui/icons/seedling.svg">
+        </div>
+    </div>
+    <script src="dist/bundle.js"></script>
+</body>
+
+</html>
