@@ -63,7 +63,9 @@ export class TreePartLeaf extends TreePartGrower {
             return clientRect;
         };
 
-        const mouseMove = (e: MouseEvent) => {
+        const pointerMove = (e: MouseEvent) => {
+            e.preventDefault();
+
             currentDragPos = new Vector2(e.clientX, e.clientY).subtract(transformOriginClient!);
             const s = (dragStartPos.x > 1) ? 1 : -1;
 
@@ -76,7 +78,7 @@ export class TreePartLeaf extends TreePartGrower {
 
             // if the user drags the tree-part past the rotation threshold, force release
             if (Math.abs(rawAngle) > FORCE_RELEASE_ANGLE_THRESHOLD) {
-                mouseUp(e);
+                pointerUp(e);
                 return;
             }
 
@@ -85,7 +87,9 @@ export class TreePartLeaf extends TreePartGrower {
             this.containerDiv.style.transform = `rotate(${currentAngle + this.baseAngle}rad)`;   // set CSS transform
         }
 
-        const mouseDown = (e: MouseEvent) => {;
+        const pointerDown = (e: MouseEvent) => {;
+            e.preventDefault();
+
             if (this.isLeafClusterDropping)
                 return;
 
@@ -108,22 +112,24 @@ export class TreePartLeaf extends TreePartGrower {
             );
             dragStartPos = new Vector2(e.clientX, e.clientY).subtract(transformOriginClient!);
 
-            this.containerDiv.removeEventListener('mousedown', mouseDown);
-            document.addEventListener('mousemove', mouseMove);
-            document.addEventListener('mouseup', mouseUp);
+            this.containerDiv.removeEventListener('pointerdown', pointerDown);
+            document.addEventListener('pointermove', pointerMove);
+            document.addEventListener('pointerup', pointerUp);
 
             this.dragging = true;
         }
 
-        const mouseUp = (e: MouseEvent) => {
+        const pointerUp = (e: MouseEvent) => {
+            e.preventDefault();
+
             lastAngle = currentAngle;
 
             this.dragging = false;
             startSpringAnimation();
 
-            this.containerDiv.addEventListener('mousedown', mouseDown);
-            document.removeEventListener('mousemove', mouseMove);
-            document.removeEventListener('mouseup', mouseUp);
+            this.containerDiv.addEventListener('pointerdown', pointerDown);
+            document.removeEventListener('pointermove', pointerMove);
+            document.removeEventListener('pointerup', pointerUp);
         }
 
         
@@ -162,11 +168,12 @@ export class TreePartLeaf extends TreePartGrower {
             );
         }
 
-        this.containerDiv.addEventListener('mousedown', mouseDown);
+        this.containerDiv.addEventListener('pointerdown', pointerDown);
     }
 
     public setupClick() {
         this.containerDiv.addEventListener('click', (e) => {
+            e.preventDefault();
             if (!this.isFinishedGrowing() || !this.isTerminal())
                 return;
 

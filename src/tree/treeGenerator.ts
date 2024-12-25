@@ -160,32 +160,21 @@ export abstract class TreeGenerator implements ITreeGeneratorParameters {
     }
 
     private resizeToContainer() {
-        const outerContainerWidth = this.parentContainer.getBoundingClientRect().width;
         const outerContainerHeight = this.parentContainer.getBoundingClientRect().height;
         const internalSize = TreeGenerator.REFERENCE_HEIGHT;
-        const tx = outerContainerWidth / internalSize;
-        const ty = outerContainerHeight / internalSize;
-        const scaleToBorder = (tx < ty) ? tx : ty;
+        const scaleY = outerContainerHeight / internalSize;
 
         this.containerBase.style.width = `${internalSize}px`;
         this.containerBase.style.height = `${internalSize}px`;
-        this.containerBase.style.transform = `scale(${scaleToBorder})`;
+        this.containerBase.style.transform = `scale(${scaleY})`;
 
-        this.containerTransformAlignment.style.width = `${internalSize * scaleToBorder}px`;
-        this.containerTransformAlignment.style.height = `${internalSize * scaleToBorder}px`;
+        this.containerTransformAlignment.style.width = `${internalSize * scaleY}px`;
+        this.containerTransformAlignment.style.height = `${internalSize * scaleY}px`;
 
-        if (tx < ty) {
-            // scale to X
-            this.containerTransformAlignment.style.top = '';
-            this.containerTransformAlignment.style.bottom = '0px';
-            this.containerTransformAlignment.style.left = '0px';
-            this.containerTransformAlignment.style.transform = 'translate(0, 0)';
-        } else {
-            // scale to Y
-            this.containerTransformAlignment.style.top = '0px';
-            this.containerTransformAlignment.style.left = '50%';
-            this.containerTransformAlignment.style.transform = 'translate(-50%, 0)';
-        }
+        this.containerTransformAlignment.style.top = '0px';
+        this.containerTransformAlignment.style.left = '50%';
+        this.containerTransformAlignment.style.transform = 'translate(-50%, 0)';
+
 
     }
 

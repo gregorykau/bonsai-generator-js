@@ -41,7 +41,6 @@ const toTitleCase = (str: string) => str.replace(/\w\S*/g, (txt) => txt.charAt(0
     const btnSerialize =  <HTMLDivElement>document.querySelector('#btnSerialize');
     const btnRegenerate = <HTMLDivElement>document.querySelector('#btnRegenerate');
     const inpSeedText = <HTMLInputElement>document.querySelector('#inpSeedText');
-    const txtTreeTitle = <HTMLElement>document.querySelector('#txtTreeTitle');
     const treeContainer = <HTMLDivElement>document.querySelector('#treeGeneratorContainer');
 
     let first = true;
@@ -55,11 +54,8 @@ const toTitleCase = (str: string) => str.replace(/\w\S*/g, (txt) => txt.charAt(0
             seed = cyrb53(inpSeedText.value.toUpperCase());
             if (first)
                 seed = STARTING_SEED;
-            txtTreeTitle.style.visibility = 'visible';
-            txtTreeTitle.innerHTML = `"${toTitleCase(inpSeedText.value)}"`;
         } else {
             // random
-            txtTreeTitle.style.visibility = 'hidden';
             seed = Math.floor(Math.random() * 10000);
         }
 
@@ -69,7 +65,7 @@ const toTitleCase = (str: string) => str.replace(/\w\S*/g, (txt) => txt.charAt(0
             null;
 
         // set the rendering scale
-        const resolutionScalar = (Math.min(window.screen.height, window.screen.width) / BonsaiGenerator.REFERENCE_HEIGHT) * window.devicePixelRatio;
+        const resolutionScalar = (window.screen.height / BonsaiGenerator.REFERENCE_HEIGHT) * window.devicePixelRatio;
 
         // destroy existing bonsai if present
         if (bonsaiGenerator)

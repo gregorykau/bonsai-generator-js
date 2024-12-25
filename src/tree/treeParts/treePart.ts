@@ -26,6 +26,7 @@ export abstract class TreePart {
         this.options = options;
 
         this.containerDiv = document.createElement('div');
+        this.containerDiv.style.touchAction = 'none';
         this.containerDiv.style.pointerEvents = 'none';
         options.treeGenerator.appendElement(this.containerDiv, options.growWithTree);
         this.setContainerDivAttributes();
