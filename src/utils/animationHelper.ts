@@ -67,10 +67,6 @@ namespace AnimationManager {
     export const onEvent = new EventTarget();
 }
 
-// setInterval(() => {
-//     console.log(`T = ${AnimationManager.getTotalPlayTime()}`);
-// }, 30);
-
 interface VisibleTimerOptions {
     onFire: () => void,
     time: number,

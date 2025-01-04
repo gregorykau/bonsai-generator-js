@@ -1,12 +1,11 @@
 import { Leaf } from "./components/leaf.js";
 import { Branch } from "./components/branch.js";
-import { TreePart } from "./treeParts/treePart.js";
+import { TreePart, TreePartContext } from "./treeParts/treePart.js";
 import { Vector2 } from "../utils/linear/vector2.js";
 import { CanvasHelper } from "../utils/canvasHelper.js";
 import { PRNG } from "../utils/random/prng.js";
 import { MersenneTwisterAdapter } from "../utils/random/mersenneTwisterAdapter.js";
 import { AnimationGroup, AnimationState, setAnimationTimeout, startAnimation } from "../utils/animationHelper.js";
-import { TreePartInter } from "./treeParts/treePartInter.js";
 import { TreePartGrower } from "./treeParts/teePartGrower.js";
 import { TreePartLeaf } from "./treeParts/treePartLeaf.js";
 import { setAnimationInterval } from "../utils/animationHelper.js";
@@ -26,11 +25,6 @@ export interface ITreeGeneratorParameters {
     getPRNG(type: 'GROW' | 'DRAW'): PRNG;
 
     getAnimationGroup(): AnimationGroup;
-
-    getSerializedKey(): number;
-    setSerializedValue(key: number, value: any): void;
-    getSerializedValue(key: number): string | number;
-    isSerializedPlayback(): boolean;
     
     getRenderScaling(): number;
     getOutlineThickness(): number;
@@ -39,13 +33,32 @@ export interface ITreeGeneratorParameters {
     getLeafOutlineTexture(): HTMLImageElement;
     getLeafTexturePattern(xOffset: number, yOffset: number): CanvasPattern;
     getBranchTexturePattern(growth: Vector2, textureName?: string): CanvasPattern;
-    getBranchWidth(depth: number, branch: Branch): number;
+    getBranchWidth(branch: Branch): number;
+}
+
+export interface TreeGeneratorContext {
+    debugging: boolean;
+    isPlayback: boolean;
+    serializedValues: Record<string, any>;
+    serializedIdxKey: number;
 }
 
 export abstract class TreeGenerator implements ITreeGeneratorParameters {
-    public constructor(options: TreeGeneratorOptions) {
+    protected constructor(options: TreeGeneratorOptions) {
         this.options = options;
         this.parentContainer = this.options.parentContainer;
+
+        this.myContext = {
+            isPlayback: options.serializedJSON != null,
+            serializedValues: options.serializedJSON ?? {},
+            serializedIdxKey: 0,
+            debugging: this.options.debugging ?? false,
+        };
+
+        this.treePartContext = {
+            ...this.myContext,
+            treeGenerator: this
+        }
 
         // hierarchy of transform divs
         this.containerBase = this.createTransformContainerDiv();
@@ -59,7 +72,7 @@ export abstract class TreeGenerator implements ITreeGeneratorParameters {
 
         // setup PRNG's
         if (options.serializedJSON)
-            this.serializedValues = options.serializedJSON;
+            this.myContext.serializedValues = options.serializedJSON;
 
         this.prngs.DRAW.init(this.options.seed);
         this.prngs.GROW.init(this.options.seed);
@@ -70,15 +83,12 @@ export abstract class TreeGenerator implements ITreeGeneratorParameters {
         // setup resize event for future window resizes
         this.resizeEventListener = this.resizeToContainer.bind(this);
         window.addEventListener('resize', this.resizeEventListener);
-
-        // start grow animation
-        // this.growAnimation();
     }
 
     public shake() {
         const cw = this.getPRNG('DRAW').random() > 0.5;
         this.treeParts
-            .filter(treePart => treePart instanceof TreePartLeaf)
+            .filter(treePart => treePart.depth >= 0)
             .forEach(treePart => {
                 const shakeDelay = this.getPRNG('DRAW').floatInRange(0, 1200);
                 this.animationGroup.addAnimation(
@@ -92,24 +102,9 @@ export abstract class TreeGenerator implements ITreeGeneratorParameters {
 
     public async grow() {
         while (!this.destroyed && !this.isFinishedGrowing) {
-            await this.growStep();
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            this.growStep();
+            await new Promise((resolve) => setTimeout(resolve, 1));
         }
-    }
-
-    protected getTreePart(branch: Branch): TreePartGrower {
-        let retTreePart: TreePartGrower | undefined;
-        if (this.branchToTreePart.has(branch)) {
-            retTreePart = this.branchToTreePart.get(branch)!;
-        } else if (branch.parent && this.branchToTreePart.has(branch.parent)) {
-            retTreePart = this.branchToTreePart.get(branch.parent)!;
-        } else {
-            retTreePart = <TreePartGrower | undefined>this.treeParts.find(treePart => (treePart instanceof TreePartGrower) && (<TreePartGrower>treePart).branches.includes(branch));
-            console.assert(retTreePart);
-            retTreePart = retTreePart!;
-        }
-        this.branchToTreePart.set(branch, retTreePart);
-        return retTreePart;
     }
 
     private createTransformContainerDiv(): HTMLDivElement {
@@ -174,17 +169,22 @@ export abstract class TreeGenerator implements ITreeGeneratorParameters {
         this.containerTransformAlignment.style.top = '0px';
         this.containerTransformAlignment.style.left = '50%';
         this.containerTransformAlignment.style.transform = 'translate(-50%, 0)';
-
-
     }
 
-    public onFinishedGrowing() { 
+    protected onFinishedGrowing() { 
         this.animationGroup.addAnimation(
             setAnimationInterval({
                 callback: () => this.shake(),
                 time: 2000
             })
         );
+
+        this.treeParts
+            .forEach(treePart => {
+                if (!(treePart instanceof TreePartGrower))
+                    return;
+                treePart.clip();
+            });
 
         console.log(`Growing completed.`);
     }
@@ -203,7 +203,7 @@ export abstract class TreeGenerator implements ITreeGeneratorParameters {
 
     public abstract markLeafReached(depth: number, leaf: Leaf): void;
 
-    public abstract getBranchWidth(depth: number, branch: Branch): number;
+    public abstract getBranchWidth(branch: Branch): number;
 
     public growStep() {
         console.assert(!this.isFinishedGrowing);
@@ -214,7 +214,7 @@ export abstract class TreeGenerator implements ITreeGeneratorParameters {
             this.onFinishedGrowing();
         }
 
-        // grow individual treeparts
+        // grow individual tree-parts
         this.treeParts.forEach(treePart => {
             if (!(treePart instanceof TreePartGrower)) {
                 treePart.draw();
@@ -235,23 +235,11 @@ export abstract class TreeGenerator implements ITreeGeneratorParameters {
         return ctx;
     }
 
-    public getSerializedKey(): number  { 
-        return this.serializedIdxKey++;
-    }
-    public setSerializedValue(key: number, value: any)  { 
-        this.serializedValues[key] = value;
-    }
-    public getSerializedValue(key: number): string | number {
-        const value = this.serializedValues[key];
-        console.assert(value !== undefined, `Serialized value attempting to be read back that doesn't exist. Are we in-sync?`);
-        return value;
-    }
-
     public getSerializedJSON(): string {
         this.treeParts.forEach(treePart => {
             treePart.serialize();
         });
-        return JSON.stringify(this.serializedValues);
+        return JSON.stringify(this.myContext.serializedValues);
     }
 
     public isSerializedPlayback(): boolean {
@@ -272,20 +260,18 @@ export abstract class TreeGenerator implements ITreeGeneratorParameters {
 
     protected treeParts: Array<TreePart> = [];
 
-    private branchToTreePart: Map<Branch, TreePartGrower> = new Map();
-
     private prngs = {
         'GROW': new MersenneTwisterAdapter(),
         'DRAW': new MersenneTwisterAdapter()
     };
+
+    private myContext: TreeGeneratorContext;
+    protected treePartContext: TreePartContext;
     
     private destroyed: boolean = false;
 
     private animationGroup: AnimationGroup = new AnimationGroup();
     
-    private serializedIdxKey: number = 0;
-    private serializedValues: Record<string, any> = {};
-
     protected isFinishedGrowing: boolean = false;
     private parentContainer: HTMLDivElement;
 

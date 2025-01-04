@@ -4,6 +4,7 @@ export class Vector2 {
     public clone(): Vector2 { return new Vector2(this._x, this._y); }
     public add(otherVector: Vector2): Vector2 { return this.clone().addInPlace(otherVector); }
     public subtract(otherVector: Vector2): Vector2 { return this.clone().subtractInPlace(otherVector); }
+    public subtractFromFloats(x: number, y: number): Vector2 { return this.clone().subtractInPlaceFromFloats(x, y); }
     public scale(scalar: number): Vector2 { return this.clone().scaleInPlace(scalar); }
     public elementMultiply(x: number, y: number): Vector2 { return new Vector2(this._x * x, this._y * y); }
     public dot(otherVec: Vector2): number { return (this._x * otherVec.x + this._y * otherVec.y); }
@@ -36,6 +37,9 @@ export class Vector2 {
     }
     public static fromAngle(angle: number): Vector2 {
         return new Vector2(Math.cos(angle), Math.sin(angle));
+    }
+    public static dot(a: Vector2, b: Vector2): number {
+        return ((a.x * b.x) + (a.y * b.y));
     }
     public static get One(): Vector2 { return new Vector2(1.0, 1.0); }
     public static get Zero(): Vector2 { return new Vector2(0.0, 0.0); }

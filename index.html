@@ -18,13 +18,11 @@
 
 <style>
     body {
-        background-color: #f6efdc;
         background-image: url('resources/ui/backnew.png');
         overflow-y: hidden;
     }
 
     .glossy {
-        border-style: double;
         text-align: center;
         background: rgba(255, 255, 255, 0.41);
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
@@ -62,6 +60,7 @@
 
     #optionsContainer #inpSeedText {
         display: inline-block;
+        text-transform: uppercase;
         color: black;
         flex-grow: 1;
         font-size: 2rem;
@@ -81,8 +80,8 @@
 
     #treeGeneratorContainer {
         position: absolute;
-        left: 0px;
-        top: 0px;
+        left: 0;
+        top: 0;
         width: 100vw;
         height: 100vh;
         overflow: hidden;
@@ -97,9 +96,9 @@
 
     </div>
     <div id="optionsContainer">
-        <input id="inpSeedText" type="text" class="glossy" placeholder="Custom Seed">
+        <label for="inpSeedText" hidden></label><input id="inpSeedText" type="text" class="glossy" placeholder="Custom Seed">
         <div id="btnRegenerate" class="btnOption glossy">
-            <img src="./resources/ui/icons/seedling.svg">
+            <img src="./resources/ui/icons/seedling.svg" alt="Regenerate button">
         </div>
     </div>
     <script src="dist/bundle.js"></script>

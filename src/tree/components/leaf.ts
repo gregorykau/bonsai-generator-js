@@ -2,13 +2,21 @@ import { ITreeGeneratorParameters } from "../treeGenerator.js";
 import { Vector2 } from "../../utils/linear/vector2.js";
 import { Branch } from "./branch.js";
 import { CanvasHelper } from "../../utils/canvasHelper.js";
+import { BranchContext } from "./branch.js";
+import { TreePart, TreePartContext } from "../treeParts/treePart.js";
 
 export interface LeafOptions {
     treeGenerator: ITreeGeneratorParameters,
     position: Vector2,
     attractionDistance: number;
     rotated?: boolean;
+    context: BranchContext;
 }
+
+export interface LeafContext extends TreePartContext {
+    treePart: TreePart;
+}
+
 export class Leaf {
     public constructor(options: LeafOptions) {
         this.options = options;
@@ -33,7 +41,8 @@ export class Leaf {
             treeGenerator: this.options.treeGenerator,
             position: this.options.position.clone(),
             attractionDistance: this.options.attractionDistance,
-            rotated: true
+            rotated: true,
+            context: this.options.context
         });
         leaf.parent = this.parent;
         return leaf;
@@ -52,8 +61,8 @@ export class Leaf {
         leafElement.height = canvasSize * renderScale;
         leafElement.style.width = canvasSize + 'px';
         leafElement.style.height = canvasSize + 'px';
-        leafElement.style.left = (parent.position.x - canvasSize * 0.5) + 'px';
-        leafElement.style.top = (parent.position.y - canvasSize * 0.5) + 'px';
+        leafElement.style.left = (parent.endPosGlobal.x - canvasSize * 0.5) + 'px';
+        leafElement.style.top = (parent.endPosGlobal.y - canvasSize * 0.5) + 'px';
 
         const ctx = <CanvasRenderingContext2D>leafElement.getContext('2d');
         ctx.scale(renderScale, renderScale);
@@ -64,22 +73,19 @@ export class Leaf {
     }
 
     public intersects(entity: Branch): boolean {
-        if (!(entity instanceof Branch))
-            return false;
-        const distance = entity.position.subtract(this.position).length();
-        // leafs intersect with branches within their radius of attraction
-        return (entity instanceof Branch) && (distance <= this.attractionDistance);
+        const distance = entity.endPos.subtract(this.position).length();
+        return (distance <= this.attractionDistance);
     }
 
     public draw(ctx: CanvasRenderingContext2D) {
         if (!this.parent)
             return;
 
-        if(this.options.treeGenerator.isSerializedPlayback())
+        if(this.options.context?.isPlayback)
             return;
 
         ctx.save();
-        ctx.translate(this.parent.position.x, this.parent.position.y);
+        ctx.translate(this.parent.endPos.x, this.parent.endPos.y);
         this.drawLeaf(ctx);
         ctx.restore();
     }

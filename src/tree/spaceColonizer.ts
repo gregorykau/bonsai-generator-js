@@ -1,22 +1,22 @@
 import { TreeGenerator, TreeGeneratorOptions } from "./treeGenerator.js";
 import { Branch, BranchOptions } from "./components/branch.js";
-import { Leaf } from "./components/leaf.js";
+import { Leaf, LeafOptions } from "./components/leaf.js";
 import { Vector2 } from "../utils/linear/vector2.js";
-import { BBox } from "../utils/linear/bbox.js";
 import { BranchGrower } from "./branchGrower.js";
 
-interface SpaceColonizerOptions {
+export interface SpaceColonizerOptions {
     treeGenerator: TreeGenerator;
     depth: number;
-    startingPoint: Vector2;
-    bbox: BBox;
+    origin: Vector2;
+    size: Vector2;
     leafCount: number;
     parentBranch?: Branch;
     branchLength: number;
-    leafAttractionDistance: number;
     spawnPoints?: Array<Vector2>;
-    branchFactory?: (options: BranchOptions) => Branch;
-    positionPredicate?: (bbox: BBox, pos: Vector2) => boolean;
+    positionPredicate?: (pos: Vector2) => boolean;
+
+    createFirstBranch: (pos: Vector2) => Branch;
+    createLeaf: (pos: Vector2) => Leaf;
 }
 
 export class SpaceColonizer implements BranchGrower {
@@ -50,41 +50,32 @@ export class SpaceColonizer implements BranchGrower {
                 // leaf position random point in bounds with respect to predicate
                 for (let j = 0; j < 100; j++) {
                     leafPosition = new Vector2(
-                        this.options.treeGenerator.getPRNG('GROW').floatInRange(this.options.bbox.minCorner.x, this.options.bbox.maxCorner.x),
-                        this.options.treeGenerator.getPRNG('GROW').floatInRange(this.options.bbox.minCorner.y, this.options.bbox.maxCorner.y),
+                        this.options.treeGenerator.getPRNG('GROW').floatInRange(0, this.options.size.x),
+                        this.options.treeGenerator.getPRNG('GROW').floatInRange(0, this.options.size.y),
                     );
-                    if (!this.options.positionPredicate || this.options.positionPredicate(this.options.bbox, leafPosition)) {
+                    if (!this.options.positionPredicate || this.options.positionPredicate(leafPosition))
                         break;
-                    }
+
                 }
             }
 
-            const leaf: Leaf = new Leaf({
-                treeGenerator: this.options.treeGenerator,
-                position: leafPosition,
-                attractionDistance: this.options.leafAttractionDistance,
-            });
+
+            const leaf: Leaf = this.options.createLeaf(leafPosition);
             this.activeLeafs.add(leaf);
         }
     }
 
     private placeBranches() {
-        const branchOptions: BranchOptions = {
-            parent: this.options.parentBranch,
-            branchLength: this.options.branchLength,
-            treeGenerator: this.options.treeGenerator,
-            position: this.options.startingPoint,
-            depth: this.options.depth,
-            firstBranch: true
-        };
-        const startingBranch = this.options.branchFactory ? this.options.branchFactory(branchOptions) : new Branch(branchOptions);
+        const startingPos = this.options.origin.add(this.options.parentBranch?.direction.scale(this.options.branchLength) ?? Vector2.Zero);
+        const startingBranch = this.options.createFirstBranch(startingPos);
+        this.branches.push(startingBranch);
         this.activeBranches.add(startingBranch);
         this.oldBranches.add(startingBranch);
     }
 
     private getClosestBranch(leaf: Leaf): Branch | null {
         let closestBranch: Branch | null = null;
-        let closesetDistance = Number.POSITIVE_INFINITY;
+        let closestDistance = Number.POSITIVE_INFINITY;
         this.activeBranches.forEach((branch) => {
             if (!leaf.intersects(branch))
                 return;
@@ -96,8 +87,8 @@ export class SpaceColonizer implements BranchGrower {
                 return;
 
             const distanceToBranch = branch.distanceTo(leaf);
-            if (distanceToBranch < closesetDistance) {
-                closesetDistance = distanceToBranch;
+            if (distanceToBranch < closestDistance) {
+                closestDistance = distanceToBranch;
                 closestBranch = branch;
             }
         });
@@ -106,7 +97,7 @@ export class SpaceColonizer implements BranchGrower {
     }
 
     public step() {
-        this.branchesLastLength = this.branches.length;
+        this.branchesLastLength = (this.stepCount == 0 ? 0 : this.branches.length);
         this.reachedLeafsLastLength = this.reachedLeafs.length;
 
         const currentReachedLeafs: Array<Leaf> = [];
@@ -128,7 +119,7 @@ export class SpaceColonizer implements BranchGrower {
             } else {
                 // leaf not yet reached, apply attraction to closest branch
 
-                const attractionVec = leaf.position.subtract(closestBranch.position);
+                const attractionVec = leaf.position.subtract(closestBranch.endPos);
                 branchToAttractionVec.set(closestBranch, (branchToAttractionVec.get(closestBranch) ?? Vector2.Zero).addInPlace(attractionVec));
             }
         });
@@ -145,14 +136,7 @@ export class SpaceColonizer implements BranchGrower {
         branchToAttractionVec.forEach((attractionVec: Vector2, branch: Branch) => {
             const growVec: Vector2 = attractionVec.normalize().scaleInPlace(this.options.branchLength);
             const vFinalGrowthVector: Vector2 = this.biasGrowthVector(growVec);
-            const newPosition: Vector2 = branch.position.add(vFinalGrowthVector);
-
-            const newBranch: Branch = branch.createChildBranch({
-                treeGenerator: this.options.treeGenerator,
-                position: newPosition,
-                depth: this.options.depth,
-                branchLength: this.options.branchLength
-            });
+            const newBranch: Branch = branch.extrude(vFinalGrowthVector);
 
             this.branches.push(newBranch);
             this.activeBranches.add(newBranch);
@@ -180,21 +164,19 @@ export class SpaceColonizer implements BranchGrower {
     public getNewBranches(): Array<Branch> {
         return this.branches.slice(this.branchesLastLength);
     }
+
     public getNewLeafs(): Array<Leaf> {
         return this.reachedLeafs.slice(this.reachedLeafsLastLength);
     }
 
-    public getReachedLeafs(): Leaf[] { return this.reachedLeafs; }
     public getLeafs(): Array<Leaf> { return this.leafs; }
     public getBranches(): Array<Branch> { return this.branches; }
     public getStepCount(): number { return this.stepCount; }
 
-    public get startingPoint(): Vector2 { return this.options.startingPoint; }
+    public get startingPoint(): Vector2 { return this.options.origin; }
     public get startingBranch(): Branch | null {
         return this.options.parentBranch ?? null;
     }
-
-    public get branchLength(): number { return this.options.branchLength; }
 
     private stepCount: number = 0;
 

@@ -1,16 +1,16 @@
-import { ITreeGeneratorParameters, TreeGenerator, TreeGeneratorOptions } from "../treeGenerator.js";
-import { Vector2 } from "../../utils/linear/vector2.js";
-import { BBox } from "../../utils/linear/bbox.js";
-import { Leaf } from "./leaf.js";
+import {ITreeGeneratorParameters} from "../treeGenerator.js";
+import {Vector2} from "../../utils/linear/vector2.js";
+import {Leaf} from "./leaf.js";
+import { TreePart, TreePartContext } from "../treeParts/treePart.js";
 
 export interface BranchOptions {
-    treeGenerator: ITreeGeneratorParameters,
     position: Vector2;
-    depth: number;
-    branchLength: number;
-
     parent?: Branch;
-    firstBranch?: boolean;
+    context: BranchContext;
+}
+
+export interface BranchContext extends TreePartContext {
+    treePart: TreePart;
 }
 
 export class Branch {
@@ -18,48 +18,60 @@ export class Branch {
         // set default options
         this.options = options;
         this._parent = options.parent ?? null;
-        this.depth = options.depth;
         this._position = options.position;
 
+        
         // set texture offset
-        if (this._parent) {
-            const xoffset = options.treeGenerator.getPRNG('GROW').floatInRange(0, 1024);
-            const length = (this._position.subtract(this._parent.position)).length();
-            this._growthTotal.y = this._parent.growthTotal.y + length;
-            if (!options.firstBranch) {
-                this._growthLocal.x = xoffset;
-                this._growthLocal.y = this._parent._growthLocal.y + length;
+        if (this.parent) {
+            const length = (this._position.subtract(this.parent.endPos)).length();
+            this.growthTotal.y = this.parent.growthTotal.y + length;
+            if (this.isFirstBranch) {
+                this.growthLocal.x = options.context.treeGenerator.getPRNG('GROW').floatInRange(0, 1024);
+                this.growthLocal.y = 0;
             } else {
-                this._growthLocal.x = 0;
-                this._growthLocal.y = 0;
+                this.growthLocal.x = this.growthLocal.x;
+                this.growthLocal.y = this.parent!.growthLocal.y + length;
             }
         }
     }
 
-    public createChildBranch(options: BranchOptions): Branch {
-        options.parent = this;
+    public extrude(direction: Vector2): Branch {
         this._childCount++;
-        return this.createInstance(options);
+        return new Branch({
+            position: this.endPos.add(direction),
+            parent: this,
+            context: this.options.context
+        });
     }
 
-    protected createInstance(options: BranchOptions): Branch {
-        return new Branch(options);
+    public get isFirstBranch() {
+        return (this.options.context?.treePart != this.options.parent?.context?.treePart);
+    }
+
+    public get context(): BranchContext | undefined {
+        return this.options.context;
     }
 
     public get angle(): number {
-        return this.parent ? Math.atan2(this.position.x - this.parent.position.x, this.parent.position.y - this.position.y) : NaN;
+        if (!this.parent)
+            return NaN;
+        return Math.atan2(this.endPos.x - this.startPos.x, this.startPos.y - this.endPos.y);
     }
 
     public get direction(): Vector2 {
-        return (!this.parent ? Vector2.Zero : this.position.subtract(this.parent.position).normalize());
+        if (!this.parent)
+            return Vector2.Zero;
+        return this.endPos.subtract(this.startPos).normalize();
     }
 
     public get branchWidth(): number {
-        return this.options.treeGenerator.getBranchWidth(this.depth, this);
+        return this.options.context.treeGenerator.getBranchWidth(this);
     }
 
     public get branchHeight(): number {
-        return this.parent?.position.subtract(this.position).length() || 0;
+        if (!this.parent)
+            return 0;
+        return this.endPos.subtract(this.startPos).length();
     }
 
     public get parent(): Branch | null { return this._parent; }
@@ -68,29 +80,38 @@ export class Branch {
 
     public get growthLocal(): Vector2 { return this._growthLocal; }
 
-    public get position(): Vector2 { return this._position; }
+    public get endPos(): Vector2 { return this._position; }
+
+    public get startPos(): Vector2 {
+        if (!this.parent)
+            return this.endPos;
+        if (this.isFirstBranch)
+            return this.parent.endPos.subtract(this.options.context!.treePart.position);
+        return this.parent.endPos;
+    }
+
+    public get endPosGlobal(): Vector2 {
+        return this.options.context!.treePart.positionGlobal.add(this.endPos);
+    }
 
     public get childCount(): number { return this._childCount; }
 
-    public distanceTo(leaf: Leaf) { return leaf.position.subtract(this.position).length(); }
+    public distanceTo(leaf: Leaf) { return leaf.position.subtract(this.endPos).length(); }
 
     public draw(ctx: CanvasRenderingContext2D, drawBorder: boolean = true) {
         if (!this.parent)
             return;
 
-        if(this.options.treeGenerator.isSerializedPlayback())
+        if(this.options.context.isPlayback)
             return;
 
-        console.assert(!this.drawn);
-        this.drawn = true;
-
-        const branchWidth: number = this.branchWidth;
-        const branchHeight: number = this.parent.position.subtract(this.position).length();
-
-        if ((branchWidth / branchHeight) > 2)
+        if ((this.branchWidth / this.branchHeight) > 2)
             this.drawWithCircle(ctx, drawBorder);
         else
             this.drawWithRectangle(ctx, drawBorder);
+
+        console.assert(!this.drawn);
+        this.drawn = true;  
     }
 
     private drawWithRectangle(ctx: CanvasRenderingContext2D, drawBorder: boolean) {
@@ -98,7 +119,7 @@ export class Branch {
             return console.assert(false);
 
         const circleRadius: number = this.branchWidth / 2;
-        const tempCanvas = this.options.treeGenerator.getTempCanvas(0);
+        const tempCanvas = this.options.context.treeGenerator.getTempCanvas(0);
 
         //  draw branch to temporary canvas
         tempCanvas.save();
@@ -130,7 +151,7 @@ export class Branch {
             // fill 'masked' area with branch texture
             tempCanvas.filter = 'none';
             tempCanvas.globalCompositeOperation = 'source-in';
-            this.drawTexture(this.options.treeGenerator.getTempCanvas(1), tempCanvas);
+            this.drawTexture(this.options.context.treeGenerator.getTempCanvas(1), tempCanvas);
             tempCanvas.globalCompositeOperation = 'source-out';
         }
         tempCanvas.restore();
@@ -138,7 +159,7 @@ export class Branch {
         // copy rendered branch to target canvas
         ctx.save();
         {
-            ctx.translate(this.parent.position.x, this.parent.position.y);
+            ctx.translate(this.startPos.x, this.startPos.y);
             ctx.rotate(this.angle);
             ctx.drawImage(tempCanvas.canvas, -this.branchWidth / 2, -(this.branchHeight));
         }
@@ -146,13 +167,13 @@ export class Branch {
 
         // draw outline
         if (drawBorder) {
-            const outlineWidth: number = this.options.treeGenerator.getOutlineThickness();
+            const outlineWidth: number = this.options.context.treeGenerator.getOutlineThickness();
             ctx.save();
             {
                 ctx.save();
                 ctx.globalCompositeOperation = 'destination-over';
                 ctx.fillStyle = 'black';
-                ctx.translate(this.parent.position.x, this.parent.position.y);
+                ctx.translate(this.startPos.x, this.startPos.y);
                 ctx.rotate(this.angle);
 
                 ctx.beginPath();
@@ -172,7 +193,7 @@ export class Branch {
                 ctx.save();
                 ctx.globalCompositeOperation = 'destination-over';
                 ctx.fillStyle = 'black';
-                ctx.translate(this.position.x, this.position.y);
+                ctx.translate(this.endPos.x, this.endPos.y);
                 ctx.beginPath();
                 ctx.arc(0, 0, circleRadius + outlineWidth, 0, Math.PI * 2);
                 ctx.fill();
@@ -181,7 +202,7 @@ export class Branch {
                 ctx.save();
                 ctx.globalCompositeOperation = 'destination-over';
                 ctx.fillStyle = 'black';
-                ctx.translate(this.parent.position.x, this.parent.position.y);
+                ctx.translate(this.startPos.x, this.startPos.y);
                 ctx.rotate(this.angle);
                 ctx.beginPath();
                 ctx.rect((-this.branchWidth / 2) - outlineWidth, 0, this.branchWidth + (outlineWidth * 2), -this.branchHeight);
@@ -197,7 +218,7 @@ export class Branch {
         if (!this.parent)
             return console.assert(false);
 
-        const tempCanvas = this.options.treeGenerator.getTempCanvas(0);
+        const tempCanvas = this.options.context.treeGenerator.getTempCanvas(0);
         const circleRadius: number = this.branchWidth / 2;
 
         //  draw branch to temporary canvas
@@ -219,7 +240,7 @@ export class Branch {
                 tempCanvas.fill();
                 tempCanvas.restore();
                 tempCanvas.globalCompositeOperation = 'source-in';
-                this.drawTexture(this.options.treeGenerator.getTempCanvas(1), tempCanvas);
+                this.drawTexture(this.options.context.treeGenerator.getTempCanvas(1), tempCanvas);
                 tempCanvas.globalCompositeOperation = 'source-out';
             }
 
@@ -228,7 +249,7 @@ export class Branch {
 
         // copy rendered branch to target canvas
         ctx.save();
-        ctx.translate(this.parent.position.x, this.parent.position.y);
+        ctx.translate(this.startPos.x, this.startPos.y);
         ctx.rotate(this.angle);
         ctx.translate(-circleRadius, -circleRadius);
         ctx.drawImage(tempCanvas.canvas, 0, 0);
@@ -236,14 +257,18 @@ export class Branch {
 
         // draw outline
         if (drawBorder) {
-            const outlineWidth: number = this.options.treeGenerator.getOutlineThickness();
+            const outlineWidth: number = this.options.context.treeGenerator.getOutlineThickness();
             ctx.save();
-            ctx.translate(this.parent.position.x, this.parent.position.y);
+            ctx.translate(this.startPos.x, this.startPos.y);
             ctx.rotate(this.angle);
             ctx.beginPath();
             // don't draw bottom border half if this is the start of a new tree part
-            const drawBottomBorder = this._growthLocal.y > 10;
-            ctx.arc(0, 0, circleRadius + outlineWidth, drawBottomBorder ? 0 : Math.PI, Math.PI * 2);
+            const drawBottomBorder = !this.isFirstBranch;
+            if (drawBottomBorder) {
+                ctx.arc(0, 0, circleRadius + outlineWidth, 0, Math.PI * 2);
+            } else {
+                ctx.arc(0, 0, circleRadius + outlineWidth, Math.PI + 0.3, Math.PI * 2 - 0.3);
+            }
             ctx.globalCompositeOperation = 'destination-over';
             ctx.fillStyle = 'black';
             ctx.fill();
@@ -253,8 +278,7 @@ export class Branch {
     }
 
     protected drawTexture(tempCanvas: CanvasRenderingContext2D, ctx: CanvasRenderingContext2D) {
-        const pattern = this.options.treeGenerator.getBranchTexturePattern(this.growthTotal);
-        tempCanvas.fillStyle = pattern;
+        tempCanvas.fillStyle = this.options.context.treeGenerator.getBranchTexturePattern(this.growthTotal);
         tempCanvas.beginPath();
         tempCanvas.rect(0, 0, <number>tempCanvas.canvas.width, <number>tempCanvas.canvas.height);
         tempCanvas.fill();
@@ -268,7 +292,6 @@ export class Branch {
 
     private _position: Vector2;
     private _parent: Branch | null;
-    protected depth: number;
 
     private _childCount: number = 0;
 

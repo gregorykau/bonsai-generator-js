@@ -27,10 +27,9 @@ function cyrb53(str: string, seed: number = 0) {
     return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 };
 
-const toTitleCase = (str: string) => str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase());
 
 (async () => {
-    const STARTING_SEED = 9644;
+    const STARTING_SEED = 2568;
     const STARTING_TEXT = "ZENITUDE";
 
     await BonsaiGenerator.loadResources();
@@ -52,7 +51,7 @@ const toTitleCase = (str: string) => str.replace(/\w\S*/g, (txt) => txt.charAt(0
         if (inpSeedText.value) {
             // from entered string
             seed = cyrb53(inpSeedText.value.toUpperCase());
-            if (first)
+            if (first || (STARTING_TEXT == inpSeedText.value))
                 seed = STARTING_SEED;
         } else {
             // random

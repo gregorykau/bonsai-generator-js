@@ -52,17 +52,4 @@ export namespace CanvasHelper {
         ctx.drawImage(borderCtx.canvas, 0, 0);
         ctx.drawImage(img, 0, 0);
     }
-
-    // const cachedImageWithBorder: Map<CanvasImageSource, CanvasRenderingContext2D> = new Map();
-    // export function drawImageWithBorder(img: CanvasImageSource, imgSize: number, ctx: CanvasRenderingContext2D | null, thickness: number): CanvasRenderingContext2D {
-    //   if (cachedImageWithBorder.has(img))
-    //     return <CanvasRenderingContext2D>cachedImageWithBorder.get(img);
-    //   const tmpCtx = createTempCanvas(imgSize, imgSize);
-    //   {
-    //     drawImageBorder(img, imgSize, tmpCtx, thickness);
-    //     ctx.drawImage(img, 0, 0);
-    //   }
-    //   cachedImageWithBorder.set(img, ctx);
-    //   return ctx;
-    // }
 }
